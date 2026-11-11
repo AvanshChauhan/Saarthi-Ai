@@ -24,8 +24,18 @@ const llm = new ChatGroq({
   maxRetries: 2,
 });
 export const createAgentGraph = async (agent) => {
-  const mcpTools = await getMcpTools();
-  const llmWithTools = llm.bindTools(mcpTools);
+  const mcpTools = await getMcpTools(agent?.tools ?? []);
+  const llmWithTools =
+    mcpTools.length > 0 ? llm.bindTools(mcpTools) : llm;
+  const enabledToolInstructions = mcpTools.some(
+    (tool) => tool.name === "saarthi_web_search_Tool",
+  )
+    ? `WEB SEARCH TOOL:
+- Web search is enabled for this agent. Use it when the user asks for current or time-sensitive information, online research, or verification that requires external sources.
+- Do not use it for simple conversation or information already provided by the user.
+- Base conclusions on the returned search results, distinguish sourced facts from uncertainty, and include relevant source titles and URLs in your answer.
+- If search fails or returns insufficient results, state that clearly; do not invent findings or citations.`
+    : "No external tools are enabled for this agent. Do not claim to have searched the web or used a tool.";
   const currentDateNtime = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
     dateStyle: "full",
@@ -171,6 +181,7 @@ For debugging, prioritize:
 ==================================================
 
 Use available tools when they materially improve the result.
+${enabledToolInstructions}
 
 Before using a tool:
 - Determine whether it is appropriate.

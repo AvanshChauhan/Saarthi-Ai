@@ -3,12 +3,8 @@ import { ArrowLeft, Bot, Check, Sparkles, Workflow } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createAgent } from "@/features/agent";
 
-// Replace these sample tools with the real tools available to your agents.
 const availableTools = [
   { id: "web-search", name: "Web search", description: "Find up-to-date information online." },
-  { id: "summarize", name: "Summarize", description: "Turn long content into clear takeaways." },
-  { id: "writing", name: "Writing assistant", description: "Draft, edit, and improve text." },
-  { id: "planning", name: "Planning", description: "Organize tasks and create practical plans." },
 ];
 
 export default function CreateAgent() {
@@ -142,7 +138,7 @@ export default function CreateAgent() {
 
           <fieldset>
             <legend className="text-sm font-medium text-zinc-200">Tools</legend>
-            <p className="mb-3 mt-1 text-xs text-zinc-500">Choose what this agent can use. These are sample tools you can replace later.</p>
+            <p className="mb-3 mt-1 text-xs text-zinc-500">Choose which tools this agent can use.</p>
             <div className="flex flex-wrap gap-2">
               {availableTools.map((tool) => {
                 const isSelected = selectedTools.includes(tool.id);

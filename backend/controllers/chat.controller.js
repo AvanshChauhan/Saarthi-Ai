@@ -8,6 +8,7 @@ import {
     MAX_RESPONSE_TOKENS,
     recordTokenUsage,
 } from "../utils/tokenUsage.js"
+import { getUnsupportedAgentToolIds } from "../mcp/langraph.mcp.js"
 
 const BASE_SYSTEM_PROMPT = `You are Saarthi AI, the assistant users interact with in the Saarthi application when no custom agent is selected.
 
@@ -70,6 +71,90 @@ export const chat=async(req,res)=>{
             if (!agent) {
                 return res.status(404).json({
                     message:"Agent not found.",
+                    success:false
+                })
+            }
+            const unsupportedTools = getUnsupportedAgentToolIds(agent.tools ?? [])
+            if (unsupportedTools.length > 0) {
+                return res.status(400).json({
+                    message:`Selected agent has unsupported tools: ${unsupportedTools.join(", ")}.`,
+                    success:false
+                })
+            }
+        }
+        const chatGraph = await createAgentGraph(agent)
+        const data=await chatGraph.invoke({
+            messages:[
+               new HumanMessage(message.trim())
+            ]},
+            {
+                configurable:{
+                    thread_id:threadId,
+                    systemPrompt:buildSystemPrompt(agent),
+                    maxOutputTokens:Math.min(MAX_RESPONSE_TOKENS, currentUsage.remaining)
+                }
+            }
+        )
+        const responseMessage=data.messages[data.messages.length-1]
+        const totalTokens=responseMessage.usage_metadata?.total_tokens
+        if (!Number.isSafeInteger(totalTokens) || totalTokens < 0) {
+            throw new Error("Chat response did not include valid token usage.")
+        }
+        const updatedUser=await recordTokenUsage(User, req.user._id, totalTokens)
+        if (!updatedUser) {
+            throw new Error("Unable to record token usage for the authenticated user.")
+        }
+        const lastMessage=responseMessage.content
+        return res.status(200).json({
+            message:"response generated successfully",
+            aiMessage:lastMessage,
+            tokenUsage:getTokenUsage(updatedUser)
+        })
+    } catch (error) {
+        console.error("Unable to generate chat response:", error)
+        return res.status(500).json({
+            message:"Unable to generate a response. Please try again.",
+            success:false
+        })
+    }
+}
+export const Agentchat=async(req,res)=>{
+    try {
+        const {message, agentId} = req.body
+        const threadId=String(req.user._id)
+        if(typeof message !== "string" || !message.trim() || !threadId){
+            return res.status(400).json({
+                message:"message / threadId is missing",
+                success:false
+            })
+        }
+        const currentUsage = getTokenUsage(req.user)
+        if (currentUsage.remaining <= 0) {
+            return res.status(429).json({
+                message:"You have reached your monthly token limit. Your allowance resets next month.",
+                success:false,
+                tokenUsage:currentUsage
+            })
+        }
+        let agent = null
+        if (agentId !== undefined && agentId !== null && agentId !== "") {
+            if (typeof agentId !== "string" || !mongoose.isValidObjectId(agentId)) {
+                return res.status(400).json({
+                    message:"Invalid agent id.",
+                    success:false
+                })
+            }
+            agent = await Agent.findOne({ _id: agentId, userId: req.user._id, isActive: true })
+            if (!agent) {
+                return res.status(404).json({
+                    message:"Agent not found.",
+                    success:false
+                })
+            }
+            const unsupportedTools = getUnsupportedAgentToolIds(agent.tools ?? [])
+            if (unsupportedTools.length > 0) {
+                return res.status(400).json({
+                    message:`Selected agent has unsupported tools: ${unsupportedTools.join(", ")}.`,
                     success:false
                 })
             }

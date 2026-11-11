@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Agent from "../models/Agent.model.js";
+import { getUnsupportedAgentToolIds } from "../mcp/langraph.mcp.js";
 
 export const createAgent = async (req, res) => {
     try {
@@ -15,15 +16,31 @@ export const createAgent = async (req, res) => {
         if (knowledgeBase && !mongoose.isValidObjectId(knowledgeBase)) {
             return res.status(400).json({ message: "Invalid knowledge base id.", success: false });
         }
+        const normalizedTools = (tools || []).map((tool) =>
+            typeof tool === "string" ? { type: tool } : tool
+        );
+        if (normalizedTools.some((tool) =>
+            !tool || typeof tool.type !== "string" || !tool.type.trim()
+        )) {
+            return res.status(400).json({
+                message: "Each tool must have a valid type.",
+                success: false,
+            });
+        }
+        const unsupportedTools = getUnsupportedAgentToolIds(normalizedTools);
+        if (unsupportedTools.length > 0) {
+            return res.status(400).json({
+                message: `Unsupported tool(s): ${unsupportedTools.join(", ")}.`,
+                success: false,
+            });
+        }
         const createdAgent = await Agent.create({
             userId: req.user._id,
             agentName: name.trim(),
             description: typeof description === "string" ? description.trim() : "",
             ...(knowledgeBase ? { knowledgeBase } : {}),
             instructions: instructions.trim(),
-            tools: (tools || []).map((tool) =>
-                typeof tool === "string" ? { type: tool } : tool
-            ),
+            tools: normalizedTools,
         });
         return res.status(201).json({
             message: "Agent created successfully",

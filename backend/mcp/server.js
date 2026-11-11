@@ -60,12 +60,24 @@ guarantee the accuracy of search results.
   },
   async ({ query }) => {
     try {
-      const result = await tavilySearch.invoke(query);
+      const result = await tavilySearch.invoke({ query });
+      if (result.error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Web search failed: ${result.error}`,
+            },
+          ],
+        };
+      }
+
       return {
         content: [
           {
             type: "text",
-            text: result,
+            text: JSON.stringify(result),
           },
         ],
       };
