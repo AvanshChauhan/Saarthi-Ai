@@ -1,4 +1,4 @@
-import chatGraph from "../utils/chatGraph.js"
+import { createAgentGraph } from "../utils/agentGraph.js"
 import { HumanMessage } from "@langchain/core/messages"
 import mongoose from "mongoose"
 import Agent from "../models/Agent.model.js"
@@ -74,6 +74,7 @@ export const chat=async(req,res)=>{
                 })
             }
         }
+        const chatGraph = await createAgentGraph(agent)
         const data=await chatGraph.invoke({
             messages:[
                new HumanMessage(message.trim())
